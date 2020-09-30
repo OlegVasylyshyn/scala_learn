@@ -4,7 +4,7 @@ import java.io._
 import java.nio.file.{Paths, Files}
 import scala.collection.mutable.ArrayBuffer
 
-object studentApp {
+object StudentApp {
   def loadStudents (students: String): Unit = {
     println("ID, Name, age, av.mark")
     for (line <- Source.fromFile(students).getLines) {
@@ -20,17 +20,13 @@ object studentApp {
       var action: String = StdIn.readLine()
       if (action == "sort by name") {
         sortByName
-      }
-      else if (action == "by age") {
+      } else if (action == "by age") {
         sortByAge(students)
-      }
-      else if (action == "by av. mark") {
+      } else if (action == "by av. mark") {
         sortByAverageMark
-      }
-      else if (action == "main menu") {
+      } else if (action == "main menu") {
         main(Array())
-      }
-      else {
+      } else {
         println("Please chose an action")
       }
     }
@@ -84,16 +80,13 @@ object studentApp {
       print("Type id - ")
       val id: Int = StdIn.readInt()
       deleteById(stud_db, id)
-    }
-    else if (action == "by name") {
+    } else if (action == "by name") {
       print("Type name - ")
       val name: String = StdIn.readLine()
       deleteByName(stud_db, name)
-    }
-    else if (action == "main menu") {
+    } else if (action == "main menu") {
       main(Array())
-    }
-    else {
+    } else {
       println("Please chose an action")
     }
   }
@@ -127,8 +120,7 @@ object studentApp {
       var arr = entry.split(", ").to(ArrayBuffer)
       if (array.indexOf(entry) > 0) {
         saveEntry("student_list.txt", arr.drop(1), "append")
-      }
-      else {
+      } else {
         saveEntry("student_list.txt", arr.drop(1), "write")
       }
     }
@@ -159,8 +151,7 @@ object studentApp {
       val id: Int = students_len + 1
       stud_entry.prepend(id.toString)
       writeLine(filename, stud_entry, mode)
-    }
-    else {
+    } else {
       val id: Int = 1
       stud_entry.prepend(id.toString)
       writeLine(filename, stud_entry, mode)
@@ -175,8 +166,7 @@ object studentApp {
         val bw = new BufferedWriter(new FileWriter(file, true))
         bw.write(line)
         bw.close()
-      }
-      else if (mode == "write") {
+      } else if (mode == "write") {
         val bw = new BufferedWriter(new FileWriter(file))
         bw.write(line)
         bw.close()
@@ -187,7 +177,6 @@ object studentApp {
   }
 
   def main(args: Array[String]): Unit = {
-    // your code
 
     while (true) {
       println("Student App")
@@ -200,17 +189,13 @@ object studentApp {
       val filename = "student_list.txt"
       if (action == "show students") {
         loadStudents(filename)
-      }
-      else if (action == "delete student") {
+      } else if (action == "delete student") {
         deleteStudent(filename)
-      }
-      else if (action == "add student") {
+      } else if (action == "add student") {
         addStudent(filename)
-      }
-      else if (action == "exit app") {
+      } else if (action == "exit app") {
         exitApp
-      }
-      else {
+      } else {
         println("Please chose an action")
       }
     }
