@@ -8,15 +8,12 @@ import scala.io.StdIn.readLine
 
 object StudentApp extends App {
   val journal = new StudentJournal
-  val fileName: String = "students.txt"
   while (true) {
     val choice = journal.menu
     choice match {
       case 1 =>
-        if (journal.addStudent())
-          println("Student added")
-        else
-          println("Record not saved")
+        println("Student added")
+        journal.addStudent()
       case 2 =>
         println("Show students\n")
         journal.showStudents()
@@ -31,10 +28,9 @@ object StudentApp extends App {
 }
 
 class StudentJournal {
+  val fileName: String = "students.txt"
 
-  def addStudent(): Boolean = {
-    var isRecordAdded = false
-
+  def addStudent(): Unit = {
     println("Enter Student Name")
     val name: String = readLine()
     println("Enter Student Age")
@@ -44,59 +40,42 @@ class StudentJournal {
 
     val student = Student(name, age, mark)
 
-    var fileInputStream: FileInputStream = null;
-    var stdLstBfr:ArrayBuffer[Student]=ArrayBuffer()
-    try {
-      fileInputStream = new FileInputStream(StudentApp.fileName)
-      val inputStream = new ObjectInputStream(fileInputStream);
-      stdLstBfr = inputStream.readObject.asInstanceOf[ArrayBuffer[Student]]
-      stdLstBfr += student
+    var fileInputStream: FileInputStream = null
+    val students: ArrayBuffer[Student] = try {
+      fileInputStream = new FileInputStream(fileName)
+      loadFile(fileName)
     } catch {
-      case e :Exception => stdLstBfr += student
+      case e :Exception => ArrayBuffer.empty
     }
 
-    val outputStream = new ObjectOutputStream(new FileOutputStream(StudentApp.fileName));
-    outputStream writeObject (stdLstBfr)
-    isRecordAdded = true
-
-    isRecordAdded
+    val outputStream = new ObjectOutputStream(new FileOutputStream(fileName))
+    outputStream writeObject (students += student)
   }
 
   def showStudents() {
-
-    val inputStream = new ObjectInputStream(new FileInputStream(StudentApp.fileName));
-    val stdLstBfr = inputStream.readObject.asInstanceOf[ArrayBuffer[Student]]
-    println("Name, age, av.mark")
-    for (std <- stdLstBfr) {
-      println(std.name + " " + std.age + " " + std.mark)
-    }
+    val studList = loadFile(fileName)
+    printList(studList)
 
     print("You can sort the list by:\n" +
-      "    \"by name\" - Sort students list by name\n" +
-      "    \"by age\" - Sort students list by age\n" +
-      "    \"by mark\" - Sort student list by average mark\n" +
-      "    \"main menu\" - Go to main menu\n")
+      "1 - Sort students list by name\n" +
+      "2 - Sort students list by age\n" +
+      "3 - Sort student list by average mark\n" +
+      "4 - Go to main menu\n")
     print("chose an action: ")
-    var action: String = readLine()
-    if (action == "by name") {
-      sort("name")
-    } else if (action == "by age") {
-      sort("age")
-    } else if (action == "by mark") {
-      sort("mark")
-    } else if (action == "main menu") {
-
-    } else {
-      println("Please chose an action")
+    val action: Int = readLine().toInt
+    action match {
+      case 1 => sort("name")
+      case 2 => sort("age")
+      case 3 => sort("mark")
+      case 4 =>
+      case _ => println("Please chose an action")
     }
   }
 
   def sort(mode: String): Unit = {
-    val inputStream = new ObjectInputStream(new FileInputStream(StudentApp.fileName));
-    val studList = inputStream.readObject.asInstanceOf[ArrayBuffer[Student]]
+    val studList = loadFile(fileName)
 
     var swapped: Boolean = true
-
     if (mode == "age") {
       while (swapped) {
         swapped = false
@@ -109,10 +88,7 @@ class StudentJournal {
           }
         }
       }
-      println("Name, age, av.mark\n")
-      for (stud <- studList) {
-        println(stud.name + " " + stud.age + " " + stud.mark)
-      }
+      printList(studList)
     } else if (mode == "mark") {
       while (swapped) {
         swapped = false
@@ -125,36 +101,25 @@ class StudentJournal {
           }
         }
       }
-      println("Name, age, av.mark\n")
-      for (stud <- studList) {
-        println(stud.name + " " + stud.age + " " + stud.mark)
-      }
+      printList(studList)
     } else if (mode == "name") {
-      val sorted =studList.sortWith(_.name < _.name)
-      println("Name, age, av.mark\n")
-      for (stud <- sorted) {
-        println(stud.name + " " + stud.age + " " + stud.mark)
-      }
+      val sorted = studList.sortWith(_.name < _.name)
+      printList(sorted)
     }
   }
 
   def deleteStudent(): Unit = {
-
-    val inputStream = new ObjectInputStream(new FileInputStream(StudentApp.fileName));
-    val studList = inputStream.readObject.asInstanceOf[ArrayBuffer[Student]]
-    println("Name, age, av.mark")
-    for (std <- studList) {
-      println(std.name + " " + std.age + " " + std.mark)
-    }
-    while (true) {
-      print("You can delete student:\n" +
-        "    \"by name\" - delete by name\n" +
-        "    \"by id\" - delete by id\n" +
-        "    \"main menu\" - Go to main menu\n")
-      print("chose an action: ")
-      val action: String = readLine()
-      val clone = studList.clone()
-      if (action == "by name") {
+    val studList = loadFile(fileName)
+    printList(studList)
+    print("You can delete student:\n" +
+      "1 - delete by name\n" +
+      "2 - delete by ordering number\n" +
+      "3 - Go to main menu\n")
+    print("Chose an action: ")
+    val clone = studList.clone()
+    val action: Int = readLine().toInt
+    action match {
+      case 1 =>
         print("Type name: ")
         val name: String = readLine()
         for (std <- clone) {
@@ -162,19 +127,28 @@ class StudentJournal {
             studList.remove(studList.indexOf(std))
           }
         }
-      } else if (action == "by id") {
-        println("delete by id")
-      } else if (action == "main menu") {
-        
-      } else {
+      case 2 =>
+        println("Type ordering number")
+        val num: Int = readLine().toInt
+        studList.remove(num)
+      case 3 =>
+      case _ =>
         println("Please chose an action")
-      }
-      println("Name, age, av.mark")
-      for (std <- studList) {
-        println(std.name + " " + std.age + " " + std.mark)
-      }
-      val outputStream = new ObjectOutputStream(new FileOutputStream(StudentApp.fileName));
-      outputStream.writeObject(studList)
+    }
+    printList(studList)
+    val outputStream = new ObjectOutputStream(new FileOutputStream(fileName))
+    outputStream.writeObject(studList)
+  }
+
+  def loadFile(file: String): ArrayBuffer[Student] = {
+    val inputStream = new ObjectInputStream(new FileInputStream(file))
+    inputStream.readObject.asInstanceOf[ArrayBuffer[Student]]
+  }
+
+  def printList(list: ArrayBuffer[Student]): Unit = {
+    println("Order num, name, age, av.mark")
+    for (student <- list) {
+      println(list.indexOf(student) + " " +student.name + " " + student.age + " " + student.mark)
     }
   }
 
