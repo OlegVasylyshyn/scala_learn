@@ -1,12 +1,12 @@
-package docs.http.scaladsl
-
 import akka.actor.typed.ActorSystem
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
 import akka.Done
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
-import akka.http.scaladsl.model.StatusCodes
+import spray.json.RootJsonFormat
+
+import scala.concurrent.ExecutionContextExecutor
 // for JSON serialization/deserialization following dependency is required:
 // "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.7"
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -21,48 +21,53 @@ import scala.io.StdIn
 
 object StudentApp {
 
-  implicit val system = ActorSystem(Behaviors.empty, "StudentApp")
-  implicit val executionContext = system.executionContext
+  implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "StudentApp")
+  implicit val executionContext: ExecutionContextExecutor = system.executionContext
 
   final case class Student(name: String, age: Int, mark: Double)
-  final case class StudentJournal(record: List[Student])
+  final case class StudentJournal(records: List[Student])
 
-  implicit val studentFormat = jsonFormat3(Student)
-  implicit val journalFormat = jsonFormat1(StudentJournal)
-
-  val fileName: String = "students.txt"
-  var fileInputStream: FileInputStream = null
-  var students: List[Student] = try {
-    fileInputStream = new FileInputStream(fileName)
-    loadFile(fileName)
-  } catch {
-    case e :Exception => List.empty
-  }
+  implicit val studentFormat: RootJsonFormat[Student] = jsonFormat3(Student)
+  implicit val journalFormat: RootJsonFormat[StudentJournal] = jsonFormat1(StudentJournal)
 
   // (fake) async database query api
   def getStudent(studentName: String): Future[Option[Student]] = Future {
+    val students = read()
     students.find(s => s.name == studentName)
   }
 
-  def addStudent(student: StudentJournal): Future[Done] = {
-    students = student match {
-      case StudentJournal(record) =>
-        record ::: students
-      case _            => students
-    }
-    saveStudents(students)
+  def getStudents: List[Student] = {
+    read()
+  }
+
+  def deleteStudent(studentName: String): Future[Done] = {
+    val students = read()
+    val newList = students.filterNot(s => s.name == studentName)
+    write(newList)
     Future { Done }
   }
 
-  def saveStudents(students: List[Student]): Unit = {
-    val fileName: String = "students.txt"
-    val outputStream = new ObjectOutputStream(new FileOutputStream(fileName))
-    outputStream writeObject (students)
+  def addStudent(journal: StudentJournal): Future[Done] = {
+    val students = read()
+    val newList = journal.records ::: students
+    write(newList)
+    Future { Done }
   }
 
-  def loadFile(file: String): List[Student] = {
-    val inputStream = new ObjectInputStream(new FileInputStream(file))
-    inputStream.readObject.asInstanceOf[List[Student]]
+  def write(students: List[Student]): Unit = {
+    val fileName: String = "students.txt"
+    val outputStream = new ObjectOutputStream(new FileOutputStream(fileName))
+    outputStream.writeObject(students)
+    outputStream.close()
+  }
+
+  def read(): List[Student] = {
+    try {
+      val inputStream = new ObjectInputStream(new FileInputStream("students.txt"))
+      inputStream.readObject.asInstanceOf[List[Student]]
+    } catch {
+      case e: Exception => List.empty
+    }
   }
 
   def main(args: Array[String]): Unit = {
@@ -71,20 +76,31 @@ object StudentApp {
         get {
           pathPrefix("student" / Remaining) { name =>
             val maybeItem: Future[Option[Student]] = getStudent(name)
-
             onSuccess(maybeItem) {
               case Some(student) => complete(student)
-              case None       => complete(StatusCodes.NotFound)
+              case None => complete("No such student to get\n")
+            }
+          }
+        },
+        delete {
+          pathPrefix("student" / Remaining) { name =>
+            val deleted: Future[Done] = deleteStudent(name)
+            onSuccess(deleted) { _ => complete("Student deleted\n")
             }
           }
         },
         post {
-          path("add-student") {
+          path("student") {
             entity(as[StudentJournal]) { student =>
               val saved: Future[Done] = addStudent(student)
               onSuccess(saved) { _ => complete("Student added\n")
               }
             }
+          }
+        },
+        get {
+          path("students") {
+            complete(getStudents)
           }
         }
       )
