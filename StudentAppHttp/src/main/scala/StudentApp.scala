@@ -12,11 +12,8 @@ import scala.concurrent.ExecutionContextExecutor
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol._
 import scala.concurrent.Future
-
-import java.io.ObjectOutputStream
-import java.io.FileOutputStream
-import java.io.ObjectInputStream
-import java.io.FileInputStream
+import java.io.{ObjectInputStream, FileInputStream, ObjectOutputStream,
+  FileOutputStream, FileNotFoundException, IOException}
 import scala.io.StdIn
 
 object StudentApp {
@@ -40,11 +37,11 @@ object StudentApp {
     read()
   }
 
-  def deleteStudent(studentName: String): Future[Done] = {
+  def deleteStudent(studentName: String): Future[Option[Student]] = Future {
     val students = read()
     val newList = students.filterNot(s => s.name == studentName)
     write(newList)
-    Future { Done }
+    students.find(s => s.name == studentName)
   }
 
   def addStudent(journal: StudentJournal): Future[Done] = {
@@ -54,19 +51,41 @@ object StudentApp {
     Future { Done }
   }
 
+  def updateStudent(journal: StudentJournal): Future[Done] = {
+    val students = read()
+    val newList1 = students.filterNot(s => s.name == journal.records.head.name)
+    val newList2 = journal.records.head :: newList1
+    write(newList2)
+    Future { Done }
+  }
+
+  def using[A <: { def close(): Unit }, B](resource: A)(f: A => B): B =
+    try {
+      f(resource)
+    } finally {
+      resource.close()
+    }
+
   def write(students: List[Student]): Unit = {
-    val fileName: String = "students.txt"
-    val outputStream = new ObjectOutputStream(new FileOutputStream(fileName))
-    outputStream.writeObject(students)
-    outputStream.close()
+    try {
+      val outputStream = new ObjectOutputStream(new FileOutputStream("students.txt"))
+      using(outputStream) { source =>
+        outputStream.writeObject(students)
+      }
+    } catch {
+      case e: FileNotFoundException => println("Couldn't find that file.")
+      case e: IOException => println("Got an IOException!")
+    }
   }
 
   def read(): List[Student] = {
     try {
       val inputStream = new ObjectInputStream(new FileInputStream("students.txt"))
-      inputStream.readObject.asInstanceOf[List[Student]]
+      using(inputStream) { source =>
+        inputStream.readObject.asInstanceOf[List[Student]]
+      }
     } catch {
-      case e: Exception => List.empty
+      case e: FileNotFoundException => List.empty
     }
   }
 
@@ -84,8 +103,19 @@ object StudentApp {
         },
         delete {
           pathPrefix("student" / Remaining) { name =>
-            val deleted: Future[Done] = deleteStudent(name)
-            onSuccess(deleted) { _ => complete("Student deleted\n")
+            val maybeItem: Future[Option[Student]] = deleteStudent(name)
+            onSuccess(maybeItem) {
+              case Some(student) => complete(student)
+              case None => complete("No such student to delete\n")
+            }
+          }
+        },
+        put {
+          path("student") {
+            entity(as[StudentJournal]) { student =>
+              val saved: Future[Done] = updateStudent(student)
+              onSuccess(saved) { _ => complete("Student updated\n")
+              }
             }
           }
         },
@@ -99,7 +129,7 @@ object StudentApp {
           }
         },
         get {
-          path("students") {
+          path("student") {
             complete(getStudents)
           }
         }
