@@ -51,13 +51,20 @@ object StudentApp {
     Future { Done }
   }
 
+
   def updateStudent(journal: StudentJournal): Future[Done] = {
-    val students = read()
-    val newList1 = students.filterNot(s => s.name == journal.records.head.name)
-    val newList2 = journal.records.head :: newList1
-    write(newList2)
-    Future { Done }
-  }
+        val students = read()
+        journal.records.headOption match {
+          case Some(record) => {
+            val oldStudents = students.filterNot(s => s.name == record.name)
+            val newStudents = journal.records ::: oldStudents
+            write(newStudents)
+            Future{ Done }
+          }
+          case None => Future { Done }
+        }
+      }
+
 
   def using[A <: { def close(): Unit }, B](resource: A)(f: A => B): B =
     try {
