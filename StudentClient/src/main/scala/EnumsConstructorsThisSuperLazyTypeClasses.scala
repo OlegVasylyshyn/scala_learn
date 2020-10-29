@@ -12,7 +12,7 @@ import scala.util.{Failure, Success}
 // mixed pattern
 // type classes
 
-object Test extends App {
+object EnumsConstructorsThisSuperLazyTypeClasses extends App {
 
   // Enum example
   sealed trait StudentRestError {
