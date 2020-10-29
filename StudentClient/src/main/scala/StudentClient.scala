@@ -1,4 +1,3 @@
-import akka.actor.Status.{Failure, Success}
 import akka.actor.{ActorSystem, ClassicActorSystemProvider}
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
@@ -8,6 +7,7 @@ import akka.http.scaladsl.unmarshalling.{Unmarshal, Unmarshaller}
 import spray.json._
 
 import scala.concurrent.ExecutionContext
+import scala.util.{Failure, Success}
 // for JSON serialization/deserialization following dependency is required:
 // "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.7"
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
@@ -31,7 +31,7 @@ object StudentClient extends App{
     choice match {
       case 1 =>
         println("Student added")
-//        journal.addStudent()
+        journal.addStudent()
       case 2 =>
         println("Show students\n")
         journal.showStudents()
@@ -70,7 +70,7 @@ class RestClient(implicit ec: ExecutionContext, mat: Materializer, system: Class
           HttpRequest(
             method = HttpMethods.POST,
             uri = baseUrl,
-            entity = HttpEntity(ContentTypes.`application/json`, records.toJson)
+            entity = HttpEntity(ContentTypes.`application/json`, records.toJson.prettyPrint)
           )
         )
 
@@ -80,8 +80,16 @@ class RestClient(implicit ec: ExecutionContext, mat: Materializer, system: Class
 
       responseFuture
         .onComplete {
-          case Success(res) => println(res)
-          case Failure(_)   => sys.error("something wrong")
+          case Failure(exception) =>
+            System.err.println(s"Was error during add new student. Err: ${exception.getMessage}")
+          case Success(HttpResponse(StatusCodes.OK, headers, entity, _)) =>
+            println(s"Was successfully added new student")
+            Unmarshal(entity).to[String].onComplete {
+              case Failure(exception) =>
+                println(s"Could not deserialize. Err: ${exception.getMessage}")
+              case Success(list) =>
+                println(s"Was deserialize list: $list")
+            }
         }
     }
 }
@@ -109,7 +117,10 @@ class StudentJournal(implicit ec: ExecutionContext, mat: Materializer, system: C
   def showStudents():Unit = {
 
     if(cache.isEmpty) {
-      client.fetchStudents.map(printList)
+      client.fetchStudents.map { list =>
+        cache = list.groupBy(_.name)
+        list
+      }.map(printList)
     } else {
       printList(cache.values.flatten.toList)
     }
