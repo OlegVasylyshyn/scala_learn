@@ -16,13 +16,14 @@ import java.io.{ObjectInputStream, FileInputStream, ObjectOutputStream,
   FileOutputStream, FileNotFoundException, IOException}
 import scala.io.StdIn
 
+final case class Student(name: String, age: Int, mark: Double) extends Serializable
+final case class StudentJournal(records: List[Student]) extends Serializable
+
 object StudentApp {
 
   implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "StudentApp")
   implicit val executionContext: ExecutionContextExecutor = system.executionContext
 
-  final case class Student(name: String, age: Int, mark: Double)
-  final case class StudentJournal(records: List[Student])
 
   implicit val studentFormat: RootJsonFormat[Student] = jsonFormat3(Student)
   implicit val journalFormat: RootJsonFormat[StudentJournal] = jsonFormat1(StudentJournal)
@@ -55,12 +56,11 @@ object StudentApp {
   def updateStudent(journal: StudentJournal): Future[Done] = {
         val students = read()
         journal.records.headOption match {
-          case Some(record) => {
+          case Some(record) =>
             val oldStudents = students.filterNot(s => s.name == record.name)
             val newStudents = journal.records ::: oldStudents
             write(newStudents)
             Future{ Done }
-          }
           case None => Future { Done }
         }
       }
@@ -75,9 +75,9 @@ object StudentApp {
 
   def write(students: List[Student]): Unit = {
     try {
-      val outputStream = new ObjectOutputStream(new FileOutputStream("students.txt"))
+      val outputStream = new FileOutputStream("students.txt")
       using(outputStream) { source =>
-        outputStream.writeObject(students)
+        source.write(journalFormat.write(StudentJournal(students)).toString.getBytes)
       }
     } catch {
       case e: FileNotFoundException => println("Couldn't find that file.")
@@ -87,12 +87,23 @@ object StudentApp {
 
   def read(): List[Student] = {
     try {
-      val inputStream = new ObjectInputStream(new FileInputStream("students.txt"))
+      val inputStream = new FileInputStream("students.txt")
       using(inputStream) { source =>
-        inputStream.readObject.asInstanceOf[List[Student]]
+        val json = scala.io.Source.fromInputStream(source).mkString
+
+        import spray.json._
+        val students = json.parseJson.convertTo[StudentJournal]
+
+        println(s"Was read object. Object : $students")
+        students.records
       }
     } catch {
-      case e: FileNotFoundException => List.empty
+      case e: FileNotFoundException =>
+        println("Couldn't find that file.")
+        List.empty
+      case e: Exception =>
+        e.printStackTrace()
+        List.empty
     }
   }
 
