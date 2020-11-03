@@ -5,15 +5,13 @@ import akka.Done
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.server.Directives._
 import spray.json.RootJsonFormat
-
 import scala.concurrent.ExecutionContextExecutor
 // for JSON serialization/deserialization following dependency is required:
 // "com.typesafe.akka" %% "akka-http-spray-json" % "10.1.7"
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import spray.json.DefaultJsonProtocol._
 import scala.concurrent.Future
-import java.io.{ObjectInputStream, FileInputStream, ObjectOutputStream,
-  FileOutputStream, FileNotFoundException, IOException}
+import java.io.{FileInputStream, FileOutputStream, FileNotFoundException, IOException}
 import scala.io.StdIn
 
 final case class Student(name: String, age: Int, mark: Double) extends Serializable
@@ -23,7 +21,6 @@ object StudentApp {
 
   implicit val system: ActorSystem[Nothing] = ActorSystem(Behaviors.empty, "StudentApp")
   implicit val executionContext: ExecutionContextExecutor = system.executionContext
-
 
   implicit val studentFormat: RootJsonFormat[Student] = jsonFormat3(Student)
   implicit val journalFormat: RootJsonFormat[StudentJournal] = jsonFormat1(StudentJournal)
